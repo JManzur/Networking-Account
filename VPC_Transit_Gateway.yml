@@ -1,0 +1,443 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: VPC with Transit Gateway
+
+Metadata: 
+  AWS::CloudFormation::Interface: 
+    ParameterGroups:
+      - Label:
+          default: "Project Name"
+        Parameters:
+          - ProjectName
+      - Label: 
+          default: "VPC Definition:"
+        Parameters: 
+          - VpcCidr
+          - PublicCidrA
+          - PublicCidrB
+          - PublicCidrC
+          - PrivateCidrA
+          - PrivateCidrB
+          - PrivateCidrC
+      - Label: 
+          default: "Transit Gateway Definition:"
+        Parameters: 
+          - AWSOrganizationId
+          - MasterAccountId
+
+Parameters:
+  ProjectName:
+    Description: Project Name to be used in tagging.
+    Type: String
+    Default: "NetAccount"
+  # VPC Parameters
+  VpcCidr:
+    Description: VPC CIDR Block
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: '10.10.0.0/16'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: Must be a valid IP CIDR range of the form x.x.x.x/x.
+  PublicCidrA:
+    Description: Public Subnet CIDR Block - AZ-A
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: '10.10.10.0/24'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: Must be a valid IP CIDR range of the form x.x.x.x/x.
+  PublicCidrB:
+    Description: Public Subnet CIDR Block - AZ-B
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: '10.10.11.0/24'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: Must be a valid IP CIDR range of the form x.x.x.x/x.
+  PublicCidrC:
+    Description: Public Subnet CIDR Block - AZ-C
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: '10.10.12.0/24'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: Must be a valid IP CIDR range of the form x.x.x.x/x.
+  PrivateCidrA:
+    Description: Private Subnet CIDR Block - AZ-A
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: '10.10.20.0/24'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: Must be a valid IP CIDR range of the form x.x.x.x/x.
+  PrivateCidrB:
+    Description: Private Subnet CIDR Block - AZ-B
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: '10.10.21.0/24'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: Must be a valid IP CIDR range of the form x.x.x.x/x.
+  PrivateCidrC:
+    Description: Private Subnet CIDR Block- AZ-C
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: '10.10.22.0/24'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: Must be a valid IP CIDR range of the form x.x.x.x/x.
+
+  # Transit Gateway Parameters
+  AWSOrganizationId:
+    Description: Enter AWS Organization ID to share the resources with. Obtain from 'AWS Organizations -> Settings'
+    Type: String
+    Default: ''
+  MasterAccountId:
+    Description: 12-digt AWS Account ID of AWS Control Tower Master Account.
+    Type: String
+    Default: ''
+
+Resources:
+  # VPC Definition:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref ProjectName, "-VPC" ]]
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+
+  # Internet Gateway Definition:
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref ProjectName, "-IG" ]]
+
+  # Internet Gateway Attachment:
+  VpcGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    DependsOn:
+      - Vpc
+      - InternetGateway
+    Properties:
+      # Resource or CloudFormation does not support tags
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  # Public Subnet AZ-A
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref ProjectName, "-Public-A" ]]
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PublicCidrA
+      AvailabilityZone: !Select [ 0, !GetAZs ]    # Get the first AZ in the list
+
+  # Public Subnet AZ-B
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref ProjectName, "-Public-B" ]]
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PublicCidrB
+      AvailabilityZone: !Select [ 1, !GetAZs ]    # Get the second AZ in the list
+
+  # Public Subnet AZ-C
+  PublicSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref ProjectName, "-Public-C" ]]
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PublicCidrC
+      AvailabilityZone: !Select [ 2, !GetAZs ]    # Get the third AZ in the list
+
+  # Private Subnet AZ-A
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref ProjectName, "-Private-A" ]]
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PrivateCidrA
+      AvailabilityZone: !Select [ 0, !GetAZs ]    # Get the first AZ in the list
+
+  # Private Subnet AZ-B
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref ProjectName, "-Private-B" ]]
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PrivateCidrB
+      AvailabilityZone: !Select [ 1, !GetAZs ]    # Get the second AZ in the list
+
+  # Private Subnet AZ-C
+  PrivateSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join ['', [!Ref ProjectName, "-Private-C" ]]
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PrivateCidrC
+      AvailabilityZone: !Select [ 2, !GetAZs ]    # Get the third AZ in the list
+
+  # Public Route table:
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      Tags:
+      - Key: Name
+        Value:  !Join ['', [!Ref ProjectName, "-Public-RT" ]]
+      VpcId: !Ref Vpc
+  PublicRoute1:
+    Type: AWS::EC2::Route
+    DependsOn: VpcGatewayAttachment
+    Properties:
+      # Resource or CloudFormation does not support tags
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  # NAT Gateway AZ-A Definition:
+  NatGatewayA:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value:  !Join ['', [!Ref ProjectName, "-NGW-A" ]]
+      AllocationId: !GetAtt ElasticIPAddressA.AllocationId #Get EIP
+      SubnetId: !Ref PublicSubnetA
+  ElasticIPAddressA:
+    Type: AWS::EC2::EIP
+    Properties:
+      Tags:
+      - Key: Name
+        Value:  !Join ['', [!Ref ProjectName, "-NGW-EIP-A" ]]
+      Domain: VPC
+
+  # NAT Gateway AZ-B Definition:
+  NatGatewayB:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value:  !Join ['', [!Ref ProjectName, "-NGW-B" ]]
+      AllocationId: !GetAtt ElasticIPAddressB.AllocationId #Get EIP
+      SubnetId: !Ref PublicSubnetB
+  ElasticIPAddressB:
+    Type: AWS::EC2::EIP
+    Properties:
+      Tags:
+      - Key: Name
+        Value:  !Join ['', [!Ref ProjectName, "-NGW-EIP-B" ]]
+      Domain: VPC
+
+  # NAT Gateway AZ-C Definition:
+  NatGatewayC:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value:  !Join ['', [!Ref ProjectName, "-NGW-C" ]]
+      AllocationId: !GetAtt ElasticIPAddressC.AllocationId #Get EIP
+      SubnetId: !Ref PublicSubnetC
+  ElasticIPAddressC:
+    Type: AWS::EC2::EIP
+    Properties:
+      Tags:
+      - Key: Name
+        Value:  !Join ['', [!Ref ProjectName, "-NGW-EIP-C" ]]
+      Domain: VPC
+
+  # Private route table A:
+  PrivateRouteTableA:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+      - Key: Name
+        Value:  !Join ['', [!Ref ProjectName, "-Private-RT-A" ]]
+  PrivateRouteA:
+    Type: AWS::EC2::Route
+    Properties:
+      # Resource or CloudFormation does not support tags
+      RouteTableId: !Ref PrivateRouteTableA
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayA
+
+  # Private route table B:
+  PrivateRouteTableB:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+      - Key: Name
+        Value:  !Join ['', [!Ref ProjectName, "-Private-RT-B" ]]
+  PrivateRouteB:
+    Type: AWS::EC2::Route
+    Properties:
+      # Resource or CloudFormation does not support tags
+      RouteTableId: !Ref PrivateRouteTableB
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayB
+
+  # Private route table C:
+  PrivateRouteTableC:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+      - Key: Name
+        Value:  !Join ['', [!Ref ProjectName, "-Private-RT-C" ]]
+  PrivateRoute1:
+    Type: AWS::EC2::Route
+    Properties:
+      # Resource or CloudFormation does not support tags
+      RouteTableId: !Ref PrivateRouteTableC
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayC
+
+  # Attach Public subnets to Public route table:
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      # Resource or CloudFormation does not support tags
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      # Resource or CloudFormation does not support tags
+      SubnetId: !Ref PublicSubnetB
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      # Resource or CloudFormation does not support tags
+      SubnetId: !Ref PublicSubnetC
+      RouteTableId: !Ref PublicRouteTable
+
+  # Attach Private subnets to Private route table:
+  PrivateSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      # Resource or CloudFormation does not support tags
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateRouteTableA
+  PrivateSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      # Resource or CloudFormation does not support tags
+      SubnetId: !Ref PrivateSubnetB
+      RouteTableId: !Ref PrivateRouteTableB
+  PrivateSubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      # Resource or CloudFormation does not support tags
+      SubnetId: !Ref PrivateSubnetC
+      RouteTableId: !Ref PrivateRouteTableC
+
+  # IAM Role - Allow VPC to send logs to CloudWatch
+  Role:
+    Type: AWS::IAM::Role
+    Properties:
+      Tags:
+        - Key: Name
+          Value:  !Join ['', [!Ref ProjectName, "-FlowLogs-Role" ]]
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: vpc-flow-logs.amazonaws.com
+          Action: sts:AssumeRole
+      RoleName: !Sub ${ProjectName}-VPCLogsRole
+      Policies:
+      - PolicyName: !Sub ${ProjectName}-VPCLogsPolicy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            - logs:DescribeLogGroups
+            - logs:DescribeLogStreams
+            Resource: !GetAtt LogGroup.Arn
+
+  # Create log group:
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      # Resource or CloudFormation does not support tags
+      RetentionInDays: 14
+      LogGroupName: !Sub /vpcflowlogs/${ProjectName}
+
+  # Enable VPC Flow Logs:
+  FlowLog:
+    Type: AWS::EC2::FlowLog
+    Properties:
+      # Resource or CloudFormation does not support tags
+      DeliverLogsPermissionArn: !GetAtt Role.Arn
+      LogGroupName: !Ref LogGroup
+      ResourceId: !Ref Vpc
+      ResourceType: VPC
+      TrafficType: ALL
+
+  # Transit Gateway:
+  # Documentation: https://docs.aws.amazon.com/es_es/AWSCloudFormation/latest/UserGuide/aws-resource-ec2-transitgateway.html
+  TransitGateway:
+    Type: AWS::EC2::TransitGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value:  !Join ['', [!Ref ProjectName, "-TG" ]]
+      Description: Cross Account Communication Gateway
+      AutoAcceptSharedAttachments: enable
+      DefaultRouteTableAssociation: enable
+      DefaultRouteTablePropagation: enable
+      DnsSupport: enable
+      VpnEcmpSupport: enable
+
+  # Transit Gateway Share:
+  # Documentation: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-resource-ram-resourceshare.html
+  ResourceShare:
+    DependsOn: TransitGateway
+    Type: AWS::RAM::ResourceShare
+    Properties:
+      Tags:
+        - Key: Name
+          Value:  !Join ['', [!Ref ProjectName, "-TG-Share" ]]
+      Name: Transit-Gateway-Org-Share
+      Principals:
+        - !Sub 'arn:aws:organizations::${MasterAccountId}:organization/${AWSOrganizationId}'
+      ResourceArns:
+        - !Sub 'arn:aws:ec2:${AWS::Region}:${AWS::AccountId}:transit-gateway/${TransitGateway}'
+
+  # Transit Gateway Attachment:
+  TransitGatewayAttachment:
+    Type: AWS::EC2::TransitGatewayAttachment
+    Properties:
+      Tags:
+        - Key: Name
+          Value:  !Join ['', [!Ref ProjectName, "-TG-Attachment" ]]
+      SubnetIds:
+      - !Ref PrivateSubnetA
+      - !Ref PrivateSubnetB
+      - !Ref PrivateSubnetC
+      TransitGatewayId: !Ref TransitGateway
+      VpcId: !Ref Vpc
